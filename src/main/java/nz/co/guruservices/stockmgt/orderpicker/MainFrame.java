@@ -1,6 +1,8 @@
 package nz.co.guruservices.stockmgt.orderpicker;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
@@ -9,8 +11,6 @@ import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.swing.AbstractAction;
-import javax.swing.Action;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -19,13 +19,15 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
+import javax.swing.JTextPane;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingWorker;
-import javax.swing.table.DefaultTableModel;
+import javax.swing.text.DefaultStyledDocument;
 
 import nz.co.guruservices.stockmgt.orderpicker.business.OrderService;
 import nz.co.guruservices.stockmgt.orderpicker.custom.JTableButtonMouseListener;
 import nz.co.guruservices.stockmgt.orderpicker.custom.JTableButtonRenderer;
+import nz.co.guruservices.stockmgt.orderpicker.model.MessageType;
 import nz.co.guruservices.stockmgt.orderpicker.model.Order;
 import nz.co.guruservices.stockmgt.orderpicker.model.OrderStatus;
 import nz.co.guruservices.stockmgt.orderpicker.model.OrderTableModel;
@@ -33,7 +35,7 @@ import nz.co.guruservices.stockmgt.orderpicker.model.OrderTableModel;
 public class MainFrame
         extends JFrame {
 
-    private JTextField barcodeField;
+    private JTextField orderNumberField;
 
     private JTextField usernameField;
 
@@ -41,7 +43,10 @@ public class MainFrame
 
     private JTable table;
 
-    private JScrollPane scrollPane;
+    private JScrollPane contentScrollPane;
+
+    private JScrollPane msgScrollPane;
+    private JTextPane msgPane;
 
     public MainFrame() {
         this.setTitle("Orders");
@@ -55,10 +60,16 @@ public class MainFrame
 
         initFields();
 
-        scrollPane = new JScrollPane();
-        scrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        contentScrollPane = new JScrollPane();
+        contentScrollPane.setBorder(BorderFactory.createEmptyBorder(10, 5, 10, 5));
+        getContentPane().add(contentScrollPane, BorderLayout.CENTER);
 
-        getContentPane().add(scrollPane, BorderLayout.CENTER);
+        msgPane = new JTextPane();
+        msgScrollPane = new JScrollPane(msgPane);
+        msgScrollPane.setBorder(BorderFactory.createEmptyBorder(5, 2, 5, 2));
+        getContentPane().add(msgScrollPane, BorderLayout.SOUTH);
+
+        setMessage(MessageType.ERROR, "dsdsdsds");
 
         // loadOrders();
 
@@ -69,8 +80,52 @@ public class MainFrame
         topPanel.setLayout(new GridBagLayout());
 
         GridBagConstraints constraints = new GridBagConstraints();
+        constraints = new GridBagConstraints();
         constraints.gridx = 0;
         constraints.gridy = 0;
+        constraints.insets = new Insets(2, 2, 2, 2);
+        constraints.weightx = 0.1;
+        constraints.anchor = GridBagConstraints.WEST;
+        topPanel.add(new JLabel("Order number: "), constraints);
+
+        orderNumberField = new JTextField();
+        orderNumberField.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                startProcessOrder();
+            }
+
+        });
+        constraints = new GridBagConstraints();
+        constraints.gridx = 1;
+        constraints.gridy = 0;
+        constraints.insets = new Insets(2, 2, 2, 2);
+        constraints.weightx = 0.7;
+        constraints.fill = GridBagConstraints.HORIZONTAL;
+        constraints.anchor = GridBagConstraints.WEST;
+        topPanel.add(orderNumberField, constraints);
+
+        final JButton processButton = new JButton("Process");
+        processButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                startProcessOrder();
+            }
+
+        });
+        constraints = new GridBagConstraints();
+        constraints.gridx = 2;
+        constraints.gridy = 0;
+        constraints.weightx = 0.2;
+        constraints.insets = new Insets(2, 2, 2, 2);
+        constraints.anchor = GridBagConstraints.EAST;
+        constraints.fill = GridBagConstraints.HORIZONTAL;
+        topPanel.add(processButton, constraints);
+
+        // load order line
+        constraints = new GridBagConstraints();
+        constraints.gridx = 0;
+        constraints.gridy = 1;
         constraints.insets = new Insets(2, 2, 2, 2);
         constraints.weightx = 0.1;
         constraints.anchor = GridBagConstraints.WEST;
@@ -85,7 +140,7 @@ public class MainFrame
         });
         constraints = new GridBagConstraints();
         constraints.gridx = 1;
-        constraints.gridy = 0;
+        constraints.gridy = 1;
         constraints.insets = new Insets(2, 2, 2, 2);
         constraints.weightx = 0.7;
         constraints.fill = GridBagConstraints.HORIZONTAL;
@@ -102,55 +157,12 @@ public class MainFrame
         });
         constraints = new GridBagConstraints();
         constraints.gridx = 2;
-        constraints.gridy = 0;
+        constraints.gridy = 1;
         constraints.weightx = 0.2;
         constraints.insets = new Insets(2, 2, 2, 2);
         constraints.anchor = GridBagConstraints.EAST;
         constraints.fill = GridBagConstraints.HORIZONTAL;
         topPanel.add(loadOrderButton, constraints);
-
-        constraints = new GridBagConstraints();
-        constraints.gridx = 0;
-        constraints.gridy = 1;
-        constraints.insets = new Insets(2, 2, 2, 2);
-        constraints.weightx = 0.1;
-        constraints.anchor = GridBagConstraints.WEST;
-        topPanel.add(new JLabel("Barcode: "), constraints);
-
-        barcodeField = new JTextField();
-        barcodeField.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent e) {
-                startProcessOrder();
-            }
-
-        });
-
-        constraints = new GridBagConstraints();
-        constraints.gridx = 1;
-        constraints.gridy = 1;
-        constraints.insets = new Insets(2, 2, 2, 2);
-        constraints.weightx = 0.7;
-        constraints.fill = GridBagConstraints.HORIZONTAL;
-        constraints.anchor = GridBagConstraints.WEST;
-        topPanel.add(barcodeField, constraints);
-
-        final JButton processButton = new JButton("Process");
-        processButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent e) {
-                startProcessOrder();
-            }
-
-        });
-        constraints = new GridBagConstraints();
-        constraints.gridx = 2;
-        constraints.gridy = 1;
-        constraints.weightx = 0.2;
-        constraints.insets = new Insets(2, 2, 2, 2);
-        constraints.anchor = GridBagConstraints.EAST;
-        constraints.fill = GridBagConstraints.HORIZONTAL;
-        topPanel.add(processButton, constraints);
 
         getContentPane().add(topPanel, BorderLayout.NORTH);
 
@@ -196,28 +208,21 @@ public class MainFrame
                     table = new JTable(model);
                     table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-                    final Action action = new AbstractAction() {
-                        @Override
-                        public void actionPerformed(final ActionEvent e) {
-                            final JTable table = (JTable) e.getSource();
-                            final int modelRow = Integer.valueOf(e.getActionCommand());
-                            ((DefaultTableModel) table.getModel()).removeRow(modelRow);
-                        }
-                    };
-
                     table.getColumnModel().getColumn(3).setCellRenderer(new JTableButtonRenderer());
                     table.addMouseListener(new JTableButtonMouseListener(table));
                     table.setRowSelectionAllowed(true);
 
                     table.setCellSelectionEnabled(true);
+                    table.getTableHeader().setBackground(new Color(153, 204, 255));
+                    table.getTableHeader().setFont(new Font("Dialog", Font.BOLD, 12));
 
-                    // final ButtonColumn buttonColumn = new ButtonColumn(table, action, 3);
-                    // buttonColumn.setMnemonic(KeyEvent.VK_D);
+                    contentScrollPane.setViewportView(table);
 
-                    scrollPane.setViewportView(table);
+                    setMessage(MessageType.INFO, "Orders are loaded successfully");
 
                 } catch (final Exception e) {
                     e.printStackTrace();
+                    setMessage(MessageType.ERROR, String.format("Failed load order: %s", e.getMessage()));
                 }
             }
 
@@ -229,7 +234,7 @@ public class MainFrame
         if (table == null) {
             return;
         }
-        final String barcode = barcodeField.getText();
+        final String barcode = orderNumberField.getText();
         if (barcode == null || barcode.trim().equals("")) {
             return;
         }
@@ -270,4 +275,29 @@ public class MainFrame
         }
 
     }
+
+    public void setMessage(final MessageType messageType, final String message) {
+        try {
+            // msgPane.setText(message);
+            final DefaultStyledDocument doc = new DefaultStyledDocument();
+            doc.insertString(0, message, null);
+            msgPane.setDocument(doc);
+            switch (messageType) {
+            case INFO:
+                msgPane.setForeground(Color.blue);
+                break;
+            case WARNING:
+                msgPane.setForeground(Color.orange);
+                break;
+            case ERROR:
+                msgPane.setForeground(Color.red);
+                break;
+
+            }
+        } catch (final Exception ex) {
+            ex.printStackTrace();
+        }
+
+    }
+
 }
