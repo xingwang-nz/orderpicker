@@ -1,0 +1,33 @@
+<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2
+  http://maven.apache.org/xsd/assembly-1.1.2.xsd">
+    <!-- Will assemble a folder with all the necessary sub-folders and files, so it can be packaged using the OPT packager. -->
+    <id>app-package</id>
+    <formats>
+        <format>zip</format>
+    </formats>
+    <!-- Add the Main.jar (uber/fat jar) to the jars folder -->
+    <files>
+        <file>
+            <source>${project.build.directory}/${main.jar.name}.jar</source>
+    <!-- <outputDirectory>jars</outputDirectory> -->
+        </file>
+    </files>
+    <fileSets>
+        <fileSet>
+            <directory>conf</directory>
+            <outputDirectory>conf</outputDirectory>
+            <includes>
+                <include>*.properties</include>
+            </includes>
+        </fileSet>
+
+        <fileSet>
+            <directory>src/db</directory>
+            <outputDirectory>db-script</outputDirectory>
+            <includes>
+                <include>*</include>
+            </includes>
+        </fileSet>
+
+    </fileSets>
+</assembly>
