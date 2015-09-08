@@ -6,8 +6,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.JButton;
-import javax.swing.JOptionPane;
 import javax.swing.table.AbstractTableModel;
+
+import nz.co.guruservices.stockmgt.orderpicker.common.OrderCompleteHandler;
 
 public class OrderTableModel
         extends AbstractTableModel {
@@ -16,8 +17,11 @@ public class OrderTableModel
 
     private List<Order> orders = new ArrayList<>();
 
-    public OrderTableModel(final List<Order> orders) {
+    private final OrderCompleteHandler orderCompleteHandler;
+
+    public OrderTableModel(final List<Order> orders, final OrderCompleteHandler orderCompleteHandler) {
         this.orders = orders;
+        this.orderCompleteHandler = orderCompleteHandler;
     }
 
     @Override
@@ -55,8 +59,11 @@ public class OrderTableModel
 
                 button.addActionListener(new ActionListener() {
                     @Override
-                    public void actionPerformed(final ActionEvent arg0) {
-                        JOptionPane.showMessageDialog(JOptionPane.getFrameForComponent(button), "Button clicked for row " + rowIndex);
+                    public void actionPerformed(final ActionEvent actionEvent) {
+                        final Order order = orders.get(rowIndex);
+                        if (orderCompleteHandler != null) {
+                            orderCompleteHandler.complete(order);
+                        }
                     }
                 });
             } else {
@@ -82,7 +89,7 @@ public class OrderTableModel
                 return order;
             }
         }
-
         return null;
     }
+
 }

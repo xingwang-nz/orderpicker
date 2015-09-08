@@ -42,4 +42,8 @@ public class Order {
         this.status = status;
     }
 
+    public boolean isNewOrder() {
+        return OrderStatus.NEW.equals(status);
+    }
+
 }

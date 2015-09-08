@@ -8,7 +8,6 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.BorderFactory;
@@ -25,8 +24,11 @@ import javax.swing.SwingWorker;
 import javax.swing.text.DefaultStyledDocument;
 
 import nz.co.guruservices.stockmgt.orderpicker.business.OrderService;
+import nz.co.guruservices.stockmgt.orderpicker.common.OrderCompleteHandler;
+import nz.co.guruservices.stockmgt.orderpicker.common.OrderSearchCriteria;
 import nz.co.guruservices.stockmgt.orderpicker.custom.JTableButtonMouseListener;
 import nz.co.guruservices.stockmgt.orderpicker.custom.JTableButtonRenderer;
+import nz.co.guruservices.stockmgt.orderpicker.db.DBManager;
 import nz.co.guruservices.stockmgt.orderpicker.model.MessageType;
 import nz.co.guruservices.stockmgt.orderpicker.model.Order;
 import nz.co.guruservices.stockmgt.orderpicker.model.OrderStatus;
@@ -39,8 +41,6 @@ public class MainFrame
 
     private JTextField usernameField;
 
-    private final OrderService orderService = new OrderService();
-
     private JTable table;
 
     private JScrollPane contentScrollPane;
@@ -48,7 +48,36 @@ public class MainFrame
     private JScrollPane msgScrollPane;
     private JTextPane msgPane;
 
+    // service object
+    private AppProperties appProperties;
+
+    private DBManager dbManager;
+
+    private OrderService orderService;
+
     public MainFrame() {
+        initUI();
+
+        initService();
+        // loadOrders();
+
+    }
+
+    private void initService() {
+        try {
+            appProperties = new AppProperties();
+            appProperties.loaddProperties();
+            dbManager = new DBManager(appProperties);
+            orderService = new OrderService();
+            orderService.setDbManager(dbManager);
+        } catch (final Exception e) {
+            e.printStackTrace();
+            logMessage(MessageType.ERROR, String.format("Error occurred during initialization: %s", e.getMessage()));
+        }
+
+    }
+
+    private void initUI() {
         this.setTitle("Orders");
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -68,11 +97,6 @@ public class MainFrame
         msgScrollPane = new JScrollPane(msgPane);
         msgScrollPane.setBorder(BorderFactory.createEmptyBorder(5, 2, 5, 2));
         getContentPane().add(msgScrollPane, BorderLayout.SOUTH);
-
-        setMessage(MessageType.ERROR, "dsdsdsds");
-
-        // loadOrders();
-
     }
 
     private void initFields() {
@@ -175,36 +199,31 @@ public class MainFrame
             @Override
             protected List<Order> doInBackground()
                     throws Exception {
-                final List<Order> orders = new ArrayList<>();
-                Order order = new Order();
-                order.setId(1L);
-                order.setOrderNumber("A11111");
-                order.setStatus(OrderStatus.NEW);
-                order.setUsername("Xing");
-                orders.add(order);
 
-                order = new Order();
-                order.setId(2L);
-                order.setOrderNumber("A11112");
-                order.setStatus(OrderStatus.NEW);
-                order.setUsername("Xing2");
-                orders.add(order);
+                final OrderSearchCriteria criteria = new OrderSearchCriteria();
+                criteria.setUsername(usernameField.getText());
 
-                order = new Order();
-                order.setId(3L);
-                order.setOrderNumber("A11113");
-                order.setStatus(OrderStatus.NEW);
-                order.setUsername("Xing3");
-                orders.add(order);
+                return orderService.loadOrders(criteria);
 
-                return orders;
             }
 
             @Override
             protected void done() {
                 try {
                     final List<Order> orders = get();
-                    final OrderTableModel model = new OrderTableModel(orders);
+                    final OrderTableModel model = new OrderTableModel(orders, new OrderCompleteHandler() {
+
+                        @Override
+                        public void complete(final Order order) {
+                            if (OrderStatus.IN_PROGRESS.equals(order.getStatus())) {
+                                new ProcessOrderWorker(order, OrderStatus.COMPLETE).execute();
+                            } else {
+                                logMessage(MessageType.WARNING, String.format("Order %s is not in_progress, cannot be completed", order.getOrderNumber()));
+                            }
+
+                        }
+
+                    });
                     table = new JTable(model);
                     table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
@@ -218,11 +237,11 @@ public class MainFrame
 
                     contentScrollPane.setViewportView(table);
 
-                    setMessage(MessageType.INFO, "Orders are loaded successfully");
+                    logMessage(MessageType.INFO, "Orders are loaded successfully");
 
                 } catch (final Exception e) {
                     e.printStackTrace();
-                    setMessage(MessageType.ERROR, String.format("Failed load order: %s", e.getMessage()));
+                    logMessage(MessageType.ERROR, String.format("Failed load order: %s", e.getMessage()));
                 }
             }
 
@@ -234,31 +253,44 @@ public class MainFrame
         if (table == null) {
             return;
         }
-        final String barcode = orderNumberField.getText();
-        if (barcode == null || barcode.trim().equals("")) {
+        final String orderNumber = orderNumberField.getText();
+        if (orderNumber == null || orderNumber.trim().equals("")) {
             return;
         }
-        new ProcessOrderWorker(barcode).execute();
+
+        final OrderTableModel model = (OrderTableModel) table.getModel();
+        final Order order = model.getOrderByNumber(orderNumber);
+        if (order == null) {
+            logMessage(MessageType.WARNING, String.format("Order %s doesn't exist", orderNumber));
+            return;
+        }
+        if (!order.isNewOrder()) {
+            logMessage(MessageType.WARNING, String.format("Order %s is not a new order", orderNumber));
+
+            return;
+        }
+        new ProcessOrderWorker(order, OrderStatus.IN_PROGRESS).execute();
 
     }
 
     private class ProcessOrderWorker
             extends SwingWorker<Order, Void> {
 
-        private String orderNumber;
+        private final Order order;
 
-        public ProcessOrderWorker(final String orderNumber) {
-            this.orderNumber = orderNumber;
+        private final OrderStatus orderStatus;
+
+        public ProcessOrderWorker(final Order order, final OrderStatus orderStatus) {
+            this.order = order;
+            this.orderStatus = orderStatus;
         }
 
         @Override
         protected Order doInBackground()
                 throws Exception {
-            final OrderTableModel model = (OrderTableModel) table.getModel();
-            final Order order = model.getOrderByNumber(orderNumber);
 
-            // TODO: call OrderService to update status
-            order.setStatus(OrderStatus.IN_PROGRESS);
+            orderService.updateOrderStatus(order.getId(), orderStatus);
+
             return order;
         }
 
@@ -266,9 +298,11 @@ public class MainFrame
         protected void done() {
             try {
                 final Order order = get();
+                order.setStatus(orderStatus);
                 final OrderTableModel model = (OrderTableModel) table.getModel();
                 model.fireTableDataChanged();
             } catch (final Exception e) {
+                logMessage(MessageType.ERROR, "Failed to process order: " + e.getMessage());
                 e.printStackTrace();
             }
 
@@ -276,7 +310,7 @@ public class MainFrame
 
     }
 
-    public void setMessage(final MessageType messageType, final String message) {
+    public void logMessage(final MessageType messageType, final String message) {
         try {
             // msgPane.setText(message);
             final DefaultStyledDocument doc = new DefaultStyledDocument();
@@ -287,7 +321,7 @@ public class MainFrame
                 msgPane.setForeground(Color.blue);
                 break;
             case WARNING:
-                msgPane.setForeground(Color.orange);
+                msgPane.setForeground(new Color(184, 110, 37));
                 break;
             case ERROR:
                 msgPane.setForeground(Color.red);
