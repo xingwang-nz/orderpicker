@@ -8,7 +8,7 @@ import java.util.List;
 import javax.swing.JButton;
 import javax.swing.table.AbstractTableModel;
 
-import nz.co.guruservices.stockmgt.orderpicker.common.OrderCompleteHandler;
+import nz.co.guruservices.stockmgt.orderpicker.common.OrderHandler;
 
 public class OrderTableModel
         extends AbstractTableModel {
@@ -17,11 +17,11 @@ public class OrderTableModel
 
     private List<Order> orders = new ArrayList<>();
 
-    private final OrderCompleteHandler orderCompleteHandler;
+    private final OrderHandler orderHandler;
 
-    public OrderTableModel(final List<Order> orders, final OrderCompleteHandler orderCompleteHandler) {
+    public OrderTableModel(final List<Order> orders, final OrderHandler orderHandler) {
         this.orders = orders;
-        this.orderCompleteHandler = orderCompleteHandler;
+        this.orderHandler = orderHandler;
     }
 
     @Override
@@ -54,15 +54,24 @@ public class OrderTableModel
         case 2:
             return order.getUsername();
         case 3:
-            final JButton button = new JButton("Complete");
+            final JButton button = new JButton();
             if (OrderStatus.IN_PROGRESS.equals(order.getStatus())) {
-
+                button.setText("Complete");
                 button.addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(final ActionEvent actionEvent) {
-                        final Order order = orders.get(rowIndex);
-                        if (orderCompleteHandler != null) {
-                            orderCompleteHandler.complete(order);
+                        if (orderHandler != null) {
+                            orderHandler.process(order, OrderStatus.COMPLETE);
+                        }
+                    }
+                });
+            } else if (OrderStatus.NEW.equals(order.getStatus())) {
+                button.setText("Process");
+                button.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(final ActionEvent actionEvent) {
+                        if (orderHandler != null) {
+                            orderHandler.process(order, OrderStatus.IN_PROGRESS);
                         }
                     }
                 });
@@ -73,6 +82,7 @@ public class OrderTableModel
                 button.invalidate();
                 button.setText("");
             }
+
             return button;
         default:
             return "";

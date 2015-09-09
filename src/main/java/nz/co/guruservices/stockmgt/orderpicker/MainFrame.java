@@ -9,22 +9,27 @@ import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSeparator;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingConstants;
 import javax.swing.SwingWorker;
 import javax.swing.text.DefaultStyledDocument;
 
 import nz.co.guruservices.stockmgt.orderpicker.business.OrderService;
-import nz.co.guruservices.stockmgt.orderpicker.common.OrderCompleteHandler;
+import nz.co.guruservices.stockmgt.orderpicker.common.OrderHandler;
 import nz.co.guruservices.stockmgt.orderpicker.common.OrderSearchCriteria;
 import nz.co.guruservices.stockmgt.orderpicker.custom.JTableButtonMouseListener;
 import nz.co.guruservices.stockmgt.orderpicker.custom.JTableButtonRenderer;
@@ -57,9 +62,7 @@ public class MainFrame
 
     public MainFrame() {
         initUI();
-
         initService();
-        // loadOrders();
 
     }
 
@@ -87,21 +90,111 @@ public class MainFrame
 
         setLayout(new BorderLayout());
 
-        initFields();
+        initTopPanelFields();
 
+        // content middle panel
         contentScrollPane = new JScrollPane();
         contentScrollPane.setBorder(BorderFactory.createEmptyBorder(10, 5, 10, 5));
         getContentPane().add(contentScrollPane, BorderLayout.CENTER);
 
+        // bottom panel
         msgPane = new JTextPane();
         msgScrollPane = new JScrollPane(msgPane);
         msgScrollPane.setBorder(BorderFactory.createEmptyBorder(5, 2, 5, 2));
         getContentPane().add(msgScrollPane, BorderLayout.SOUTH);
     }
 
-    private void initFields() {
-        final JPanel topPanel = new JPanel();
-        topPanel.setLayout(new GridBagLayout());
+    private void initTopPanelFields() {
+        final JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        getContentPane().add(panel, BorderLayout.NORTH);
+
+        initProcessOrderNumberPanel(panel);
+
+        panel.add(new JSeparator(SwingConstants.HORIZONTAL));
+
+        initSearchPanel(panel);
+
+    }
+
+    private JCheckBox newCheckbox;
+    private JCheckBox inProgressCheckbox;
+    private JCheckBox completeCheckbox;
+
+    private void initSearchPanel(final JPanel parentPanel) {
+        final JPanel panel = new JPanel();
+        panel.setLayout(new GridBagLayout());
+        parentPanel.add(panel);
+
+        GridBagConstraints constraints = new GridBagConstraints();
+        constraints.gridx = 0;
+        constraints.gridy = 0;
+        constraints.insets = new Insets(2, 2, 2, 2);
+        constraints.weightx = 0.05;
+        constraints.anchor = GridBagConstraints.WEST;
+        panel.add(new JLabel("User: "), constraints);
+
+        usernameField = new JTextField();
+        constraints = new GridBagConstraints();
+        constraints.gridx = 1;
+        constraints.gridy = 0;
+        constraints.insets = new Insets(2, 2, 2, 2);
+        constraints.weightx = 0.45;
+        constraints.fill = GridBagConstraints.HORIZONTAL;
+        constraints.anchor = GridBagConstraints.WEST;
+        panel.add(usernameField, constraints);
+
+        newCheckbox = new JCheckBox("New");
+        newCheckbox.setSelected(true);
+        constraints = new GridBagConstraints();
+        constraints.gridx = 2;
+        constraints.gridy = 0;
+        constraints.insets = new Insets(2, 2, 2, 2);
+        constraints.weightx = 0.1;
+        constraints.anchor = GridBagConstraints.EAST;
+        panel.add(newCheckbox, constraints);
+
+        inProgressCheckbox = new JCheckBox("In Progress");
+        inProgressCheckbox.setSelected(true);
+        constraints = new GridBagConstraints();
+        constraints.gridx = 3;
+        constraints.gridy = 0;
+        constraints.insets = new Insets(2, 2, 2, 2);
+        constraints.weightx = 0.1;
+        constraints.anchor = GridBagConstraints.EAST;
+        panel.add(inProgressCheckbox, constraints);
+
+        completeCheckbox = new JCheckBox("Complete");
+        constraints = new GridBagConstraints();
+        constraints.gridx = 4;
+        constraints.gridy = 0;
+        constraints.insets = new Insets(2, 2, 2, 2);
+        constraints.weightx = 0.1;
+        constraints.anchor = GridBagConstraints.EAST;
+        panel.add(completeCheckbox, constraints);
+
+        final JButton searchOrderButton = new JButton("Search Orders");
+        searchOrderButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                searchOrders();
+            }
+
+        });
+        constraints = new GridBagConstraints();
+        constraints.gridx = 5;
+        constraints.gridy = 0;
+        constraints.weightx = 0.2;
+        constraints.insets = new Insets(2, 2, 2, 2);
+        constraints.anchor = GridBagConstraints.EAST;
+        constraints.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(searchOrderButton, constraints);
+    }
+
+    private JPanel initProcessOrderNumberPanel(final JPanel parentPanel) {
+        final JPanel panel = new JPanel();
+        panel.setLayout(new GridBagLayout());
+        parentPanel.add(panel);
 
         GridBagConstraints constraints = new GridBagConstraints();
         constraints = new GridBagConstraints();
@@ -110,13 +203,13 @@ public class MainFrame
         constraints.insets = new Insets(2, 2, 2, 2);
         constraints.weightx = 0.1;
         constraints.anchor = GridBagConstraints.WEST;
-        topPanel.add(new JLabel("Order number: "), constraints);
+        panel.add(new JLabel("Order number: "), constraints);
 
         orderNumberField = new JTextField();
         orderNumberField.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(final ActionEvent e) {
-                startProcessOrder();
+                startProcessOrder(orderNumberField.getText());
             }
 
         });
@@ -127,13 +220,13 @@ public class MainFrame
         constraints.weightx = 0.7;
         constraints.fill = GridBagConstraints.HORIZONTAL;
         constraints.anchor = GridBagConstraints.WEST;
-        topPanel.add(orderNumberField, constraints);
+        panel.add(orderNumberField, constraints);
 
         final JButton processButton = new JButton("Process");
         processButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(final ActionEvent e) {
-                startProcessOrder();
+                startProcessOrder(orderNumberField.getText());
             }
 
         });
@@ -144,55 +237,11 @@ public class MainFrame
         constraints.insets = new Insets(2, 2, 2, 2);
         constraints.anchor = GridBagConstraints.EAST;
         constraints.fill = GridBagConstraints.HORIZONTAL;
-        topPanel.add(processButton, constraints);
-
-        // load order line
-        constraints = new GridBagConstraints();
-        constraints.gridx = 0;
-        constraints.gridy = 1;
-        constraints.insets = new Insets(2, 2, 2, 2);
-        constraints.weightx = 0.1;
-        constraints.anchor = GridBagConstraints.WEST;
-        topPanel.add(new JLabel("User: "), constraints);
-
-        usernameField = new JTextField();
-        usernameField.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent e) {
-            }
-
-        });
-        constraints = new GridBagConstraints();
-        constraints.gridx = 1;
-        constraints.gridy = 1;
-        constraints.insets = new Insets(2, 2, 2, 2);
-        constraints.weightx = 0.7;
-        constraints.fill = GridBagConstraints.HORIZONTAL;
-        constraints.anchor = GridBagConstraints.WEST;
-        topPanel.add(usernameField, constraints);
-
-        final JButton loadOrderButton = new JButton("Load Orders");
-        loadOrderButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent e) {
-                loadOrders();
-            }
-
-        });
-        constraints = new GridBagConstraints();
-        constraints.gridx = 2;
-        constraints.gridy = 1;
-        constraints.weightx = 0.2;
-        constraints.insets = new Insets(2, 2, 2, 2);
-        constraints.anchor = GridBagConstraints.EAST;
-        constraints.fill = GridBagConstraints.HORIZONTAL;
-        topPanel.add(loadOrderButton, constraints);
-
-        getContentPane().add(topPanel, BorderLayout.NORTH);
-
+        panel.add(processButton, constraints);
+        return panel;
     }
 
-    private void loadOrders() {
+    private void searchOrders() {
 
         new SwingWorker<List<Order>, Void>() {
 
@@ -202,8 +251,17 @@ public class MainFrame
 
                 final OrderSearchCriteria criteria = new OrderSearchCriteria();
                 criteria.setUsername(usernameField.getText());
+                if (newCheckbox.isSelected()) {
+                    criteria.addSearchStatus(OrderStatus.NEW);
+                }
+                if (inProgressCheckbox.isSelected()) {
+                    criteria.addSearchStatus(OrderStatus.IN_PROGRESS);
+                }
 
-                return orderService.loadOrders(criteria);
+                if (completeCheckbox.isSelected()) {
+                    criteria.addSearchStatus(OrderStatus.COMPLETE);
+                }
+                return orderService.searchOrders(criteria);
 
             }
 
@@ -211,14 +269,15 @@ public class MainFrame
             protected void done() {
                 try {
                     final List<Order> orders = get();
-                    final OrderTableModel model = new OrderTableModel(orders, new OrderCompleteHandler() {
+                    final OrderTableModel model = new OrderTableModel(orders, new OrderHandler() {
 
                         @Override
-                        public void complete(final Order order) {
-                            if (OrderStatus.IN_PROGRESS.equals(order.getStatus())) {
-                                new ProcessOrderWorker(order, OrderStatus.COMPLETE).execute();
-                            } else {
-                                logMessage(MessageType.WARNING, String.format("Order %s is not in_progress, cannot be completed", order.getOrderNumber()));
+                        public void process(final Order order, final OrderStatus newStatus) {
+
+                            if (OrderStatus.IN_PROGRESS.equals(newStatus)) {
+                                startProcessOrder(order.getOrderNumber());
+                            } else if (OrderStatus.COMPLETE.equals(newStatus)) {
+                                completeOrder(order.getOrderNumber());
                             }
 
                         }
@@ -249,47 +308,62 @@ public class MainFrame
 
     }
 
-    private void startProcessOrder() {
-        if (table == null) {
-            return;
-        }
-        final String orderNumber = orderNumberField.getText();
+    // change order to in_progress
+    private void startProcessOrder(final String orderNumber) {
         if (orderNumber == null || orderNumber.trim().equals("")) {
             return;
         }
-
-        final OrderTableModel model = (OrderTableModel) table.getModel();
-        final Order order = model.getOrderByNumber(orderNumber);
-        if (order == null) {
-            logMessage(MessageType.WARNING, String.format("Order %s doesn't exist", orderNumber));
-            return;
-        }
-        if (!order.isNewOrder()) {
-            logMessage(MessageType.WARNING, String.format("Order %s is not a new order", orderNumber));
-
-            return;
-        }
-        new ProcessOrderWorker(order, OrderStatus.IN_PROGRESS).execute();
-
+        new ProcessOrderWorker(orderNumber, OrderStatus.IN_PROGRESS).execute();
     }
 
+    private void completeOrder(final String orderNumber) {
+        new ProcessOrderWorker(orderNumber, OrderStatus.COMPLETE).execute();
+    }
+
+    /**
+     * the process order worker to chagne order with the number to be the new status
+     * 
+     *
+     */
     private class ProcessOrderWorker
             extends SwingWorker<Order, Void> {
 
-        private final Order order;
+        private final String orderNumber;
 
-        private final OrderStatus orderStatus;
+        private final OrderStatus newStatus;
 
-        public ProcessOrderWorker(final Order order, final OrderStatus orderStatus) {
-            this.order = order;
-            this.orderStatus = orderStatus;
+        public ProcessOrderWorker(final String orderNUmber, final OrderStatus newStatus) {
+            this.orderNumber = orderNUmber;
+            this.newStatus = newStatus;
         }
 
         @Override
         protected Order doInBackground()
                 throws Exception {
 
-            orderService.updateOrderStatus(order.getId(), orderStatus);
+            if (!OrderStatus.IN_PROGRESS.equals(newStatus) && !OrderStatus.COMPLETE.equals(newStatus)) {
+                logMessage(MessageType.WARNING, String.format("Process order to be %s", newStatus));
+                return null;
+            }
+
+            final Order order = orderService.getOrderByNumber(orderNumber.trim());
+            if (order == null) {
+                logMessage(MessageType.WARNING, String.format("Order %s doesn't not exist", orderNumber));
+                return null;
+            }
+
+            if (OrderStatus.IN_PROGRESS.equals(newStatus) && !order.isNewOrder()) {
+                logMessage(MessageType.WARNING, String.format("Cannot process the order %s, it is not a new order", orderNumber));
+                return null;
+            }
+
+            if (OrderStatus.COMPLETE.equals(newStatus) && !order.isInProgress()) {
+                logMessage(MessageType.WARNING, String.format("Cannot complete order %s, it is not in_progress", orderNumber));
+                return null;
+            }
+
+            orderService.updateOrderStatus(order.getId(), newStatus);
+            logMessage(MessageType.INFO, String.format("Order %s has been updated to be %s", orderNumber, newStatus));
 
             return order;
         }
@@ -297,12 +371,16 @@ public class MainFrame
         @Override
         protected void done() {
             try {
-                final Order order = get();
-                order.setStatus(orderStatus);
-                final OrderTableModel model = (OrderTableModel) table.getModel();
-                model.fireTableDataChanged();
-            } catch (final Exception e) {
-                logMessage(MessageType.ERROR, "Failed to process order: " + e.getMessage());
+                if (get() != null && table != null) {
+                    final OrderTableModel model = (OrderTableModel) table.getModel();
+                    final Order order = model.getOrderByNumber(orderNumber);
+                    if (order != null) {
+                        order.setStatus(newStatus);
+                        model.fireTableDataChanged();
+                    }
+                }
+            } catch (InterruptedException | ExecutionException e) {
+                logMessage(MessageType.ERROR, e.getMessage());
                 e.printStackTrace();
             }
 

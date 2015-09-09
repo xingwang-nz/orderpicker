@@ -46,4 +46,8 @@ public class Order {
         return OrderStatus.NEW.equals(status);
     }
 
+    public boolean isInProgress() {
+        return OrderStatus.IN_PROGRESS.equals(status);
+    }
+
 }

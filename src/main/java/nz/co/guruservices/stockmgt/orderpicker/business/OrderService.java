@@ -20,24 +20,37 @@ public class OrderService {
         this.dbManager = dbManager;
     }
 
-    public List<Order> loadOrders(final OrderSearchCriteria criteria)
+    public List<Order> searchOrders(final OrderSearchCriteria criteria)
             throws SQLException {
 
-        String sql = "select o.*, u.user_name from \"order\" o join \"user\" u on u.id=o.user_id where o.status != 'COMPLETE'";
+        final StringBuilder sql = new StringBuilder("select o.*, u.user_name from \"order\" o join \"user\" u on u.id=o.user_id");
+
+        boolean hasUsernameSearch = false;
         if (criteria.getUsername() != null && !criteria.getUsername().trim().equals("")) {
-            sql += " and lower(u.user_name) = '" + criteria.getUsername().toLowerCase() + "'";
+            sql.append(" where lower(u.user_name) = '").append(criteria.getUsername().toLowerCase()).append("'");
+            hasUsernameSearch = true;
         }
 
-        try (Connection connection = dbManager.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        final List<OrderStatus> statusList = criteria.getStatusList();
+        if (statusList.size() > 0) {
+            sql.append(hasUsernameSearch ? " and " : " where ");
+            sql.append("status in (");
+            boolean firstStatus = true;
+            for (final OrderStatus orderStatus : statusList) {
+                sql.append(!firstStatus ? "," : "");
+                sql.append("'").append(orderStatus.toString()).append("'");
+                firstStatus = false;
+            }
+            sql.append(")");
+        }
+
+        try (Connection connection = dbManager.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement(sql.toString())) {
             final List<Order> orders = new ArrayList<>();
 
             final ResultSet rs = preparedStatement.executeQuery();
 
             while (rs.next()) {
-                final Order order = new Order();
-                order.setId(rs.getLong("id"));
-                order.setOrderNumber(rs.getString("order_no"));
-                order.setStatus(OrderStatus.valueOf(rs.getString("status")));
+                final Order order = mapRow(rs);
                 order.setUsername(rs.getString("user_name"));
                 orders.add(order);
             }
@@ -45,6 +58,43 @@ public class OrderService {
             return orders;
         }
 
+    }
+
+    private Order mapRow(final ResultSet rs)
+            throws SQLException {
+        final Order order = new Order();
+        order.setId(rs.getLong("id"));
+        order.setOrderNumber(rs.getString("order_no"));
+        order.setStatus(OrderStatus.valueOf(rs.getString("status")));
+        return order;
+    }
+
+    public Order getOrderByNumber(final String orderNumber)
+            throws SQLException {
+        final String sql = "select * from \"order\" where order_no = ?";
+        Connection connection = null;
+        PreparedStatement preparedStatement = null;
+
+        try {
+            connection = dbManager.getConnection();
+            preparedStatement = connection.prepareStatement(sql);
+            preparedStatement.setString(1, orderNumber);
+            final ResultSet rs = preparedStatement.executeQuery();
+
+            if (rs.next()) {
+                return mapRow(rs);
+            } else {
+                return null;
+            }
+        } finally {
+            if (preparedStatement != null) {
+                preparedStatement.close();
+            }
+
+            if (connection != null) {
+                connection.close();
+            }
+        }
     }
 
     public void updateOrderStatus(final long id, final OrderStatus status)
