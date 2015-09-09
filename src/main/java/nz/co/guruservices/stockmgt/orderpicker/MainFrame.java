@@ -2,6 +2,7 @@ package nz.co.guruservices.stockmgt.orderpicker;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.EventQueue;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -12,20 +13,20 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import javax.swing.BorderFactory;
-import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JSeparator;
+import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.ListSelectionModel;
-import javax.swing.SwingConstants;
 import javax.swing.SwingWorker;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 import javax.swing.text.DefaultStyledDocument;
 
 import nz.co.guruservices.stockmgt.orderpicker.business.OrderService;
@@ -86,11 +87,10 @@ public class MainFrame
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         // center the jframe on screen
         setLocationRelativeTo(null);
-        setVisible(true);
 
         setLayout(new BorderLayout());
 
-        initTopPanelFields();
+        initTopPanel();
 
         // content middle panel
         contentScrollPane = new JScrollPane();
@@ -102,18 +102,42 @@ public class MainFrame
         msgScrollPane = new JScrollPane(msgPane);
         msgScrollPane.setBorder(BorderFactory.createEmptyBorder(5, 2, 5, 2));
         getContentPane().add(msgScrollPane, BorderLayout.SOUTH);
+
+        setVisible(true);
+        focuseOrderNumberField();
     }
 
-    private void initTopPanelFields() {
-        final JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        getContentPane().add(panel, BorderLayout.NORTH);
+    private void focuseOrderNumberField() {
+        EventQueue.invokeLater(new Runnable() {
 
-        initProcessOrderNumberPanel(panel);
+            @Override
+            public void run() {
+                orderNumberField.grabFocus();
+                orderNumberField.requestFocus();
+            }
+        });
+    }
 
-        panel.add(new JSeparator(SwingConstants.HORIZONTAL));
+    private void initTopPanel() {
+        final JTabbedPane tabbedPane = new JTabbedPane();
 
-        initSearchPanel(panel);
+        tabbedPane.addTab("Scan", initProcessOrderNumberPanel());
+        tabbedPane.addTab("Search", initSearchPanel());
+
+        tabbedPane.addChangeListener(new ChangeListener() {
+
+            @Override
+            public void stateChanged(final ChangeEvent changeEvent) {
+                final JTabbedPane sourceTabbedPane = (JTabbedPane) changeEvent.getSource();
+                final int index = sourceTabbedPane.getSelectedIndex();
+                if (index == 0) {
+                    focuseOrderNumberField();
+                }
+
+            }
+        });
+
+        getContentPane().add(tabbedPane, BorderLayout.NORTH);
 
     }
 
@@ -121,10 +145,9 @@ public class MainFrame
     private JCheckBox inProgressCheckbox;
     private JCheckBox completeCheckbox;
 
-    private void initSearchPanel(final JPanel parentPanel) {
+    private JPanel initSearchPanel() {
         final JPanel panel = new JPanel();
         panel.setLayout(new GridBagLayout());
-        parentPanel.add(panel);
 
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.gridx = 0;
@@ -189,12 +212,13 @@ public class MainFrame
         constraints.anchor = GridBagConstraints.EAST;
         constraints.fill = GridBagConstraints.HORIZONTAL;
         panel.add(searchOrderButton, constraints);
+
+        return panel;
     }
 
-    private JPanel initProcessOrderNumberPanel(final JPanel parentPanel) {
+    private JPanel initProcessOrderNumberPanel() {
         final JPanel panel = new JPanel();
         panel.setLayout(new GridBagLayout());
-        parentPanel.add(panel);
 
         GridBagConstraints constraints = new GridBagConstraints();
         constraints = new GridBagConstraints();
@@ -209,7 +233,7 @@ public class MainFrame
         orderNumberField.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(final ActionEvent e) {
-                startProcessOrder(orderNumberField.getText());
+                startProcessOrder(orderNumberField.getText(), true);
             }
 
         });
@@ -226,7 +250,7 @@ public class MainFrame
         processButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(final ActionEvent e) {
-                startProcessOrder(orderNumberField.getText());
+                startProcessOrder(orderNumberField.getText(), true);
             }
 
         });
@@ -275,7 +299,7 @@ public class MainFrame
                         public void process(final Order order, final OrderStatus newStatus) {
 
                             if (OrderStatus.IN_PROGRESS.equals(newStatus)) {
-                                startProcessOrder(order.getOrderNumber());
+                                startProcessOrder(order.getOrderNumber(), false);
                             } else if (OrderStatus.COMPLETE.equals(newStatus)) {
                                 completeOrder(order.getOrderNumber());
                             }
@@ -309,15 +333,30 @@ public class MainFrame
     }
 
     // change order to in_progress
-    private void startProcessOrder(final String orderNumber) {
+    private void startProcessOrder(final String orderNumber, final boolean clearOrderNumberField) {
         if (orderNumber == null || orderNumber.trim().equals("")) {
+            focuseOrderNumberField();
             return;
         }
-        new ProcessOrderWorker(orderNumber, OrderStatus.IN_PROGRESS).execute();
+        final ProcessOrderWorker processOrderWorker = new ProcessOrderWorker(orderNumber, OrderStatus.IN_PROGRESS);
+        if (clearOrderNumberField) {
+            processOrderWorker.setProcessOrderListener(new ProcessOrderListener() {
+
+                @Override
+                public void onSuccess() {
+                    orderNumberField.setText("");
+                }
+
+            });
+        }
+        processOrderWorker.execute();
+        orderNumberField.setText("");
+        focuseOrderNumberField();
     }
 
     private void completeOrder(final String orderNumber) {
         new ProcessOrderWorker(orderNumber, OrderStatus.COMPLETE).execute();
+        focuseOrderNumberField();
     }
 
     /**
@@ -332,6 +371,8 @@ public class MainFrame
 
         private final OrderStatus newStatus;
 
+        private ProcessOrderListener processOrderListener;
+
         public ProcessOrderWorker(final String orderNUmber, final OrderStatus newStatus) {
             this.orderNumber = orderNUmber;
             this.newStatus = newStatus;
@@ -341,31 +382,38 @@ public class MainFrame
         protected Order doInBackground()
                 throws Exception {
 
-            if (!OrderStatus.IN_PROGRESS.equals(newStatus) && !OrderStatus.COMPLETE.equals(newStatus)) {
-                logMessage(MessageType.WARNING, String.format("Process order to be %s", newStatus));
+            try {
+
+                if (!OrderStatus.IN_PROGRESS.equals(newStatus) && !OrderStatus.COMPLETE.equals(newStatus)) {
+                    logMessage(MessageType.WARNING, String.format("Process order to be %s", newStatus));
+                    return null;
+                }
+
+                final Order order = orderService.getOrderByNumber(orderNumber.trim());
+                if (order == null) {
+                    logMessage(MessageType.WARNING, String.format("Order %s doesn't not exist", orderNumber));
+                    return null;
+                }
+
+                if (OrderStatus.IN_PROGRESS.equals(newStatus) && !order.isNewOrder()) {
+                    logMessage(MessageType.WARNING, String.format("Order %s is already in progress", orderNumber));
+                    return null;
+                }
+
+                if (OrderStatus.COMPLETE.equals(newStatus) && !order.isInProgress()) {
+                    logMessage(MessageType.WARNING, String.format("Cannot complete order %s, it is not in_progress", orderNumber));
+                    return null;
+                }
+
+                orderService.updateOrderStatus(order.getId(), newStatus);
+                logMessage(MessageType.INFO, String.format("Order %s has been updated to be %s", orderNumber, newStatus));
+
+                return order;
+            } catch (final Exception e) {
+                e.printStackTrace();
+                logMessage(MessageType.ERROR, "Process order failed: " + e.getMessage());
                 return null;
             }
-
-            final Order order = orderService.getOrderByNumber(orderNumber.trim());
-            if (order == null) {
-                logMessage(MessageType.WARNING, String.format("Order %s doesn't not exist", orderNumber));
-                return null;
-            }
-
-            if (OrderStatus.IN_PROGRESS.equals(newStatus) && !order.isNewOrder()) {
-                logMessage(MessageType.WARNING, String.format("Cannot process the order %s, it is not a new order", orderNumber));
-                return null;
-            }
-
-            if (OrderStatus.COMPLETE.equals(newStatus) && !order.isInProgress()) {
-                logMessage(MessageType.WARNING, String.format("Cannot complete order %s, it is not in_progress", orderNumber));
-                return null;
-            }
-
-            orderService.updateOrderStatus(order.getId(), newStatus);
-            logMessage(MessageType.INFO, String.format("Order %s has been updated to be %s", orderNumber, newStatus));
-
-            return order;
         }
 
         @Override
@@ -378,6 +426,9 @@ public class MainFrame
                         order.setStatus(newStatus);
                         model.fireTableDataChanged();
                     }
+                    if (processOrderListener != null) {
+                        processOrderListener.onSuccess();
+                    }
                 }
             } catch (InterruptedException | ExecutionException e) {
                 logMessage(MessageType.ERROR, e.getMessage());
@@ -386,6 +437,14 @@ public class MainFrame
 
         }
 
+        public void setProcessOrderListener(final ProcessOrderListener processOrderListener) {
+            this.processOrderListener = processOrderListener;
+        }
+
+    }
+
+    private interface ProcessOrderListener {
+        void onSuccess();
     }
 
     public void logMessage(final MessageType messageType, final String message) {
