@@ -9,24 +9,25 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
-import javax.swing.JCheckBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JTabbedPane;
+import javax.swing.JSeparator;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingConstants;
 import javax.swing.SwingWorker;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
 import javax.swing.text.DefaultStyledDocument;
 
 import nz.co.guruservices.stockmgt.orderpicker.business.OrderService;
@@ -34,6 +35,7 @@ import nz.co.guruservices.stockmgt.orderpicker.common.OrderHandler;
 import nz.co.guruservices.stockmgt.orderpicker.common.OrderSearchCriteria;
 import nz.co.guruservices.stockmgt.orderpicker.custom.JTableButtonMouseListener;
 import nz.co.guruservices.stockmgt.orderpicker.custom.JTableButtonRenderer;
+import nz.co.guruservices.stockmgt.orderpicker.custom.NonFocusCheckbox;
 import nz.co.guruservices.stockmgt.orderpicker.db.DBManager;
 import nz.co.guruservices.stockmgt.orderpicker.model.MessageType;
 import nz.co.guruservices.stockmgt.orderpicker.model.Order;
@@ -104,46 +106,61 @@ public class MainFrame
         getContentPane().add(msgScrollPane, BorderLayout.SOUTH);
 
         setVisible(true);
-        focuseOrderNumberField();
+
+        // Make textField get the focus whenever frame is activated.
+        this.addWindowFocusListener(new WindowAdapter() {
+            @Override
+            public void windowGainedFocus(final WindowEvent e) {
+                orderNumberField.requestFocusInWindow();
+            }
+        });
+
     }
 
     private void focuseOrderNumberField() {
         EventQueue.invokeLater(new Runnable() {
-
             @Override
             public void run() {
-                orderNumberField.grabFocus();
-                orderNumberField.requestFocus();
+                orderNumberField.requestFocusInWindow();
             }
         });
     }
 
     private void initTopPanel() {
-        final JTabbedPane tabbedPane = new JTabbedPane();
+        final JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        getContentPane().add(panel, BorderLayout.NORTH);
 
-        tabbedPane.addTab("Scan", initProcessOrderNumberPanel());
-        tabbedPane.addTab("Search", initSearchPanel());
-
-        tabbedPane.addChangeListener(new ChangeListener() {
-
-            @Override
-            public void stateChanged(final ChangeEvent changeEvent) {
-                final JTabbedPane sourceTabbedPane = (JTabbedPane) changeEvent.getSource();
-                final int index = sourceTabbedPane.getSelectedIndex();
-                if (index == 0) {
-                    focuseOrderNumberField();
-                }
-
-            }
-        });
-
-        getContentPane().add(tabbedPane, BorderLayout.NORTH);
-
+        panel.add(initProcessOrderNumberPanel());
+        panel.add(new JSeparator(SwingConstants.HORIZONTAL));
+        panel.add(initSearchPanel());
     }
 
-    private JCheckBox newCheckbox;
-    private JCheckBox inProgressCheckbox;
-    private JCheckBox completeCheckbox;
+    // private void initTopPanel() {
+    // final JTabbedPane tabbedPane = new JTabbedPane();
+    //
+    // tabbedPane.addTab("Scan", initProcessOrderNumberPanel());
+    // tabbedPane.addTab("Search", initSearchPanel());
+    //
+    // tabbedPane.addChangeListener(new ChangeListener() {
+    //
+    // @Override
+    // public void stateChanged(final ChangeEvent changeEvent) {
+    // final JTabbedPane sourceTabbedPane = (JTabbedPane) changeEvent.getSource();
+    // final int index = sourceTabbedPane.getSelectedIndex();
+    // if (index == 0) {
+    // focuseOrderNumberField();
+    // }
+    //
+    // }
+    // });
+    //
+    // getContentPane().add(tabbedPane, BorderLayout.NORTH);
+    // }
+
+    private NonFocusCheckbox newCheckbox;
+    private NonFocusCheckbox inProgressCheckbox;
+    private NonFocusCheckbox completeCheckbox;
 
     private JPanel initSearchPanel() {
         final JPanel panel = new JPanel();
@@ -167,7 +184,7 @@ public class MainFrame
         constraints.anchor = GridBagConstraints.WEST;
         panel.add(usernameField, constraints);
 
-        newCheckbox = new JCheckBox("New");
+        newCheckbox = new NonFocusCheckbox("New", orderNumberField);
         newCheckbox.setSelected(true);
         constraints = new GridBagConstraints();
         constraints.gridx = 2;
@@ -177,7 +194,7 @@ public class MainFrame
         constraints.anchor = GridBagConstraints.EAST;
         panel.add(newCheckbox, constraints);
 
-        inProgressCheckbox = new JCheckBox("In Progress");
+        inProgressCheckbox = new NonFocusCheckbox("In Progress", orderNumberField);
         inProgressCheckbox.setSelected(true);
         constraints = new GridBagConstraints();
         constraints.gridx = 3;
@@ -187,7 +204,7 @@ public class MainFrame
         constraints.anchor = GridBagConstraints.EAST;
         panel.add(inProgressCheckbox, constraints);
 
-        completeCheckbox = new JCheckBox("Complete");
+        completeCheckbox = new NonFocusCheckbox("Complete", orderNumberField);
         constraints = new GridBagConstraints();
         constraints.gridx = 4;
         constraints.gridy = 0;
@@ -201,6 +218,7 @@ public class MainFrame
             @Override
             public void actionPerformed(final ActionEvent e) {
                 searchOrders();
+                focuseOrderNumberField();
             }
 
         });
@@ -309,6 +327,13 @@ public class MainFrame
                     });
                     table = new JTable(model);
                     table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+                    table.addMouseListener(new java.awt.event.MouseAdapter() {
+                        @Override
+                        public void mouseClicked(final java.awt.event.MouseEvent evt) {
+                            focuseOrderNumberField();
+                        }
+                    });
 
                     table.getColumnModel().getColumn(3).setCellRenderer(new JTableButtonRenderer());
                     table.addMouseListener(new JTableButtonMouseListener(table));
