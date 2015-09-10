@@ -6,6 +6,7 @@ import java.awt.EventQueue;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -170,50 +171,32 @@ public class MainFrame
         constraints.gridx = 0;
         constraints.gridy = 0;
         constraints.insets = new Insets(2, 2, 2, 2);
-        constraints.weightx = 0.05;
-        constraints.anchor = GridBagConstraints.WEST;
-        panel.add(new JLabel("User: "), constraints);
+        constraints.weightx = 0.1;
+        constraints.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(new JLabel("                        "), constraints);
 
-        usernameField = new JTextField();
+        final JPanel checkboxPanel = new JPanel();
+        checkboxPanel.setLayout(new GridLayout(0, 3));
         constraints = new GridBagConstraints();
         constraints.gridx = 1;
         constraints.gridy = 0;
         constraints.insets = new Insets(2, 2, 2, 2);
-        constraints.weightx = 0.45;
+        constraints.weightx = 0.8;
         constraints.fill = GridBagConstraints.HORIZONTAL;
-        constraints.anchor = GridBagConstraints.WEST;
-        panel.add(usernameField, constraints);
+        panel.add(checkboxPanel, constraints);
 
         newCheckbox = new NonFocusCheckbox("New", orderNumberField);
         newCheckbox.setSelected(true);
-        constraints = new GridBagConstraints();
-        constraints.gridx = 2;
-        constraints.gridy = 0;
-        constraints.insets = new Insets(2, 2, 2, 2);
-        constraints.weightx = 0.1;
-        constraints.anchor = GridBagConstraints.EAST;
-        panel.add(newCheckbox, constraints);
+        checkboxPanel.add(newCheckbox);
 
         inProgressCheckbox = new NonFocusCheckbox("In Progress", orderNumberField);
         inProgressCheckbox.setSelected(true);
-        constraints = new GridBagConstraints();
-        constraints.gridx = 3;
-        constraints.gridy = 0;
-        constraints.insets = new Insets(2, 2, 2, 2);
-        constraints.weightx = 0.1;
-        constraints.anchor = GridBagConstraints.EAST;
-        panel.add(inProgressCheckbox, constraints);
+        checkboxPanel.add(inProgressCheckbox);
 
         completeCheckbox = new NonFocusCheckbox("Complete", orderNumberField);
-        constraints = new GridBagConstraints();
-        constraints.gridx = 4;
-        constraints.gridy = 0;
-        constraints.insets = new Insets(2, 2, 2, 2);
-        constraints.weightx = 0.1;
-        constraints.anchor = GridBagConstraints.EAST;
-        panel.add(completeCheckbox, constraints);
+        checkboxPanel.add(completeCheckbox);
 
-        final JButton searchOrderButton = new JButton("Search Orders");
+        final JButton searchOrderButton = new JButton("Load Orders");
         searchOrderButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(final ActionEvent e) {
@@ -223,9 +206,9 @@ public class MainFrame
 
         });
         constraints = new GridBagConstraints();
-        constraints.gridx = 5;
+        constraints.gridx = 2;
         constraints.gridy = 0;
-        constraints.weightx = 0.2;
+        constraints.weightx = 0.1;
         constraints.insets = new Insets(2, 2, 2, 2);
         constraints.anchor = GridBagConstraints.EAST;
         constraints.fill = GridBagConstraints.HORIZONTAL;
@@ -243,8 +226,9 @@ public class MainFrame
         constraints.gridx = 0;
         constraints.gridy = 0;
         constraints.insets = new Insets(2, 2, 2, 2);
-        constraints.weightx = 0.1;
+        constraints.weightx = 0.05;
         constraints.anchor = GridBagConstraints.WEST;
+        constraints.fill = GridBagConstraints.HORIZONTAL;
         panel.add(new JLabel("Order number: "), constraints);
 
         orderNumberField = new JTextField();
@@ -259,7 +243,7 @@ public class MainFrame
         constraints.gridx = 1;
         constraints.gridy = 0;
         constraints.insets = new Insets(2, 2, 2, 2);
-        constraints.weightx = 0.7;
+        constraints.weightx = 0.85;
         constraints.fill = GridBagConstraints.HORIZONTAL;
         constraints.anchor = GridBagConstraints.WEST;
         panel.add(orderNumberField, constraints);
@@ -275,7 +259,7 @@ public class MainFrame
         constraints = new GridBagConstraints();
         constraints.gridx = 2;
         constraints.gridy = 0;
-        constraints.weightx = 0.2;
+        constraints.weightx = 0.1;
         constraints.insets = new Insets(2, 2, 2, 2);
         constraints.anchor = GridBagConstraints.EAST;
         constraints.fill = GridBagConstraints.HORIZONTAL;
@@ -292,7 +276,9 @@ public class MainFrame
                     throws Exception {
 
                 final OrderSearchCriteria criteria = new OrderSearchCriteria();
-                criteria.setUsername(usernameField.getText());
+
+                // criteria.setUsername(usernameField.getText());
+
                 if (newCheckbox.isSelected()) {
                     criteria.addSearchStatus(OrderStatus.NEW);
                 }
