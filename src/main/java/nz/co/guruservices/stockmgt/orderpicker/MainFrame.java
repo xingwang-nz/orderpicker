@@ -77,6 +77,7 @@ public class MainFrame
             dbManager = new DBManager(appProperties);
             orderService = new OrderService();
             orderService.setDbManager(dbManager);
+            searchOrders();
         } catch (final Exception e) {
             e.printStackTrace();
             logMessage(MessageType.ERROR, String.format("Error occurred during initialization: %s", e.getMessage()));
